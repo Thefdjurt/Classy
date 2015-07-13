@@ -1,0 +1,29 @@
+dofile("Class") --screw os.loadAPI :P
+Person=Class("Person",--Class name
+function(name,age)--Call function
+	private.name=name
+	public.age=age
+end,
+function()--Public environment
+	age=0
+	function getName(...)
+		return private.name
+	end
+	function setName(name)
+		private.name=name
+	end
+	function isDead()
+		return age>=properties.oldest
+	end
+end,
+function()--Private environment
+	name=""
+end,
+{--Properties
+	oldest=102,
+}
+)
+john=Person("John",21)
+jane=Person("Jane",30)
+old_man_jenkins=Person("Jimmy",101.894124)
+--P.S. Objects/returned tables have '__iter' and '__read' functions

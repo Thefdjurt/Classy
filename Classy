@@ -1,0 +1,108 @@
+--[=======[
+	Version 0.2
+	TODO:
+	-Make 'define' function for all every environments, supporting specific type and non-specific
+	-Allow 'extending' or 'extend' function in call
+	-etc.
+]=======]
+
+
+
+--Make the index readable, not editable
+function pr_mt(table,jva)
+	local function iter(fn)
+		if (type(fn)~="function") then error("Usage: function(k,v) --[[Code...]] end") end
+		for k,v in pairs(table) do
+			fn(k,v)
+		end
+	end
+	local function read()
+		local t="{\n"
+		for k,v in pairs(table) do
+			t=t.."  "..k..":  "..(v=="" and '"' or "")..tostring(v)..(v=="" and '"' or "")..",\n"
+		end
+		return t.."}"
+	end
+	local nt={}
+	local mt={
+		__index=function(t,k)return (k=="__iter" and iter) or (k=="__read" and read) or table[k] end,
+		__newindex=function(_,k,v)
+			if (jva and table[k]~=nil and type(table[k])~="function" and type(table[k])==type(v)) then
+				table[k] = v
+			end
+		end,
+		__metatable={"No."}
+	}
+	return setmetatable(nt,mt),mt,table
+end
+
+Class=(function()
+	local classes = {}
+	local C={
+		lookup = function(name)
+			return classes[name]
+		end,
+	}
+	C.isClass = function(c)
+		return not(type(c)~="table" or type(c.__className)~="string" or C.lookup(c.__className)==nil or C.lookup(c.__className).call~=c.call)
+	end
+
+	local C,mt = pr_mt(C)
+		
+	mt.__call=function(_,name,call,public,private,properties)
+		if (not name) then error("Class name required.",2)end
+		if (not(call) or type(call)~="function") then error("Call function required.",2) end
+		if (classes[name]~=nil)then error("This class already exists.",2)end
+
+		local c={private=private,public=public,className=name}
+		local pr_env=properties or {}; pr_env.class=pr_mt(c); pr_env.__constructor=function(...) return pr_env(...) end; pr_env, mt = pr_mt(pr_env)
+		
+		c.properties=pr_env; c.constructor = pr_env.__constructor
+
+		mt.__call=function(_,...)
+			local pv_env={}
+			local pb_env={}
+			local ref={properties=pr_env,private=pv_env,public=pb_env}
+			
+			local pv={}
+			setmetatable(pv,{
+				__index=function(_,k)
+					return pv_env[k] or ref[k] or _G[k]
+				end,
+				__newindex=function(_,k,v)
+					pv_env[k]=v
+				end,
+			})
+			setfenv(private, pv)
+			private(); pv_env=pr_mt(pv_env,true); ref.private=pv_env
+
+			local pb={}
+			setmetatable(pb,{
+				__index=function(_,k)
+					return pb_env[k] or ref[k] or _G[k]
+				end,
+				__newindex=function(_,k,v)
+					pb_env[k]=v
+				end,
+			})
+			setfenv(public, pb)
+			public(); pb_env=pr_mt(pb_env,true); ref.public=pb_env
+
+			local new_env={}
+			local new={}
+			setmetatable(new,{
+				__index=function(_,k)
+					return ref[k] or _G[k]
+				end,
+				__newindex=function()end,
+			})
+			setfenv(call, new)
+			call(...); new_env=pr_mt(new_env,true);
+			print(pb_env.getName())
+			return pb_env
+		end
+		classes[name]=pr_env.class
+		return pr_env
+	end
+	return C
+end)()
